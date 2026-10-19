@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="7dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/btnContaRepeat"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_conta_repeat"
+            android:contentDescription="Repetir item"
+            android:padding="6dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_add" />
+
+        <TextView
+            android:id="@+id/txtContaQtd"
+            android:layout_width="36dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/txtContaProduto"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/txtContaValor"
+            android:layout_width="88dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/txtContaDetalhe"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="80dp"
+        android:layout_marginTop="4dp"
+        android:textColor="#6B7280"
+        android:textSize="12sp"
+        android:visibility="gone" />
+</LinearLayout>
