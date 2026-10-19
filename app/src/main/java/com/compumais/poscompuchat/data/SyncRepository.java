@@ -188,6 +188,9 @@ public class SyncRepository {
         e.type = m.type;
         e.status = m.status;
         e.contactName = m.contactName;
+        e.contactPhone = m.contactPhone;
+        e.askPhone = m.askPhone;
+        e.keywordValidation = m.keywordValidation;
         e.totalValue = m.totalValue;
         e.displayOrder = m.displayOrder;
         e.section = m.section;

@@ -120,7 +120,19 @@ public class PosApi {
     }
 
     private String body(Request request) throws IOException {
-        try (Response resp = client.newCall(request).execute()) {
+        return execute(client, request);
+    }
+
+    private String bodyLong(Request request) throws IOException {
+        OkHttpClient slow = client.newBuilder()
+                .readTimeout(45, TimeUnit.SECONDS)
+                .callTimeout(50, TimeUnit.SECONDS)
+                .build();
+        return execute(slow, request);
+    }
+
+    private String execute(OkHttpClient http, Request request) throws IOException {
+        try (Response resp = http.newCall(request).execute()) {
             String raw = resp.body() != null ? resp.body().string() : "";
             if (!resp.isSuccessful()) {
                 throw new IOException("HTTP " + resp.code() + " " + raw);
@@ -155,11 +167,69 @@ public class PosApi {
         return c.mesas;
     }
 
-    public void ocupar(int mesaId, String customerName, int userId) throws IOException {
+    public List<CatalogModels.CustomerDto> customers(String q) throws IOException {
+        String query = q == null ? "" : q.trim();
+        String raw = body(req("/pos/customers?q=" + android.net.Uri.encode(query)).get().build());
+        JsonObject o = gson.fromJson(raw, JsonObject.class);
+        List<CatalogModels.CustomerDto> out = new java.util.ArrayList<>();
+        if (o != null && o.has("customers") && o.get("customers").isJsonArray()) {
+            CatalogModels.CustomerDto[] arr = gson.fromJson(o.get("customers"), CatalogModels.CustomerDto[].class);
+            if (arr != null) {
+                java.util.Collections.addAll(out, arr);
+            }
+        }
+        return out;
+    }
+
+    public static class OccupyResult {
+        public String status;
+        public String message;
+        public String contactName;
+        public String contactPhone;
+    }
+
+    public OccupyResult ocupar(int mesaId, String customerName, String phone, int userId) throws IOException {
         JsonObject o = new JsonObject();
         o.addProperty("customerName", customerName);
         o.addProperty("userId", userId);
-        body(req("/pos/mesas/" + mesaId + "/ocupar").post(RequestBody.create(o.toString(), JSON)).build());
+        if (phone != null && !phone.trim().isEmpty()) {
+            o.addProperty("phone", phone.trim());
+        }
+        String raw = bodyLong(req("/pos/mesas/" + mesaId + "/ocupar")
+                .post(RequestBody.create(o.toString(), JSON)).build());
+        return parseOccupy(raw);
+    }
+
+    public OccupyResult confirmarOcupacao(int mesaId, String keyword, String customerName, String phone) throws IOException {
+        JsonObject o = new JsonObject();
+        o.addProperty("keyword", keyword == null ? "" : keyword.trim());
+        o.addProperty("customerName", customerName == null ? "" : customerName);
+        if (phone != null && !phone.trim().isEmpty()) {
+            o.addProperty("phone", phone.trim());
+        }
+        String raw = bodyLong(req("/pos/mesas/" + mesaId + "/confirmar-ocupacao")
+                .post(RequestBody.create(o.toString(), JSON)).build());
+        return parseOccupy(raw);
+    }
+
+    private OccupyResult parseOccupy(String raw) {
+        OccupyResult result = new OccupyResult();
+        result.status = "occupied";
+        JsonObject resp = gson.fromJson(raw, JsonObject.class);
+        if (resp == null) return result;
+        if (resp.has("status") && !resp.get("status").isJsonNull()) {
+            result.status = resp.get("status").getAsString();
+        }
+        if (resp.has("message") && !resp.get("message").isJsonNull()) {
+            result.message = resp.get("message").getAsString();
+        }
+        if (resp.has("contactName") && !resp.get("contactName").isJsonNull()) {
+            result.contactName = resp.get("contactName").getAsString();
+        }
+        if (resp.has("contactPhone") && !resp.get("contactPhone").isJsonNull()) {
+            result.contactPhone = resp.get("contactPhone").getAsString();
+        }
+        return result;
     }
 
     public String trocarNomeContato(int mesaId, String customerName) throws IOException {

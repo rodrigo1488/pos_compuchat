@@ -12,6 +12,9 @@ public class MesaEntity {
     public String type;
     public String status;
     public String contactName;
+    public String contactPhone;
+    public boolean askPhone;
+    public boolean keywordValidation;
     public double totalValue;
     public int displayOrder;
     public String section;

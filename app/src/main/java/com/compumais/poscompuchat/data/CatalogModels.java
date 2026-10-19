@@ -51,6 +51,12 @@ public class CatalogModels {
         public String profile;
     }
 
+    public static class CustomerDto {
+        public int id;
+        public String name;
+        public String phone;
+    }
+
     public static class MesaDto {
         public int id;
         public String number;
@@ -58,6 +64,9 @@ public class CatalogModels {
         public String type;
         public String status;
         public String contactName;
+        public String contactPhone;
+        public boolean askPhone;
+        public boolean keywordValidation;
         @SerializedName("valortotal")
         public double totalValue;
         public int displayOrder;
