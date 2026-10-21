@@ -2,4 +2,6 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="pos_dine_in">#15803D</color>
+    <color name="pos_takeaway">#C2410C</color>
 </resources>

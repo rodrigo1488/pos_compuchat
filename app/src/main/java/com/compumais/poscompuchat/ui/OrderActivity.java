@@ -38,15 +38,18 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class OrderActivity extends AppCompatActivity {
     public static final String EXTRA_BROWSE_ONLY = "browseOnly";
     private final List<CatalogModels.ProductDto> allProducts = new ArrayList<>();
     private final List<CatalogModels.ProductDto> shown = new ArrayList<>();
     private final List<CatalogModels.CartLine> cart = new ArrayList<>();
+    private final Map<Integer, Integer> pendingQty = new HashMap<>();
     private final Gson gson = new Gson();
     private SyncRepository repo;
     private ProductAdapter adapter;
@@ -392,25 +395,41 @@ public class OrderActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void addProduct(CatalogModels.ProductDto p) {
+    private int pendingQuantity(int productId) {
+        Integer q = pendingQty.get(productId);
+        if (q == null || q < 1) return 1;
+        return Math.min(q, 99);
+    }
+
+    private void rememberQuantity(int productId, int qty) {
+        pendingQty.put(productId, Math.max(1, Math.min(99, qty)));
+    }
+
+    private void resetPendingQuantity(int productId) {
+        pendingQty.put(productId, 1);
+        if (adapter != null) adapter.notifyDataSetChanged();
+    }
+
+    private void addProduct(CatalogModels.ProductDto p, int quantity) {
         if (browseOnly) {
             Toast.makeText(this, "Abra uma mesa para lançar o pedido", Toast.LENGTH_SHORT).show();
             return;
         }
+        int qty = Math.max(1, quantity);
         if (p.variations != null && !p.variations.isEmpty()
                 && p.variations.get(0).options != null
                 && !p.variations.get(0).options.isEmpty()) {
-            pickOption(p, false);
+            pickOption(p, false, qty);
             return;
         }
         if (p.variablePrice) {
-            askVariablePrice(p, null);
+            askVariablePrice(p, null, qty);
             return;
         }
-        maybeAddonsThenCart(p, null, p.value);
+        maybeAddonsThenCart(p, null, p.value, qty);
     }
 
-    private void pickOption(CatalogModels.ProductDto p, boolean half) {
+    private void pickOption(CatalogModels.ProductDto p, boolean half, int quantity) {
         CatalogModels.VariationDto v = p.variations.get(0);
         String[] labels = new String[v.options.size()];
         for (int i = 0; i < v.options.size(); i++) {
@@ -422,17 +441,17 @@ public class OrderActivity extends AppCompatActivity {
                 .setItems(labels, (d, which) -> {
                     CatalogModels.OptionDto opt = v.options.get(which);
                     if (half) {
-                        startHalf(p, opt);
+                        startHalf(p, opt, quantity);
                     } else if (p.variablePrice) {
-                        askVariablePrice(p, opt);
+                        askVariablePrice(p, opt, quantity);
                     } else {
-                        maybeAddonsThenCart(p, opt, opt.value);
+                        maybeAddonsThenCart(p, opt, opt.value, quantity);
                     }
                 })
                 .show();
     }
 
-    private void askVariablePrice(CatalogModels.ProductDto p, CatalogModels.OptionDto opt) {
+    private void askVariablePrice(CatalogModels.ProductDto p, CatalogModels.OptionDto opt, int quantity) {
         EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         input.setHint("Valor unitário");
@@ -442,7 +461,7 @@ public class OrderActivity extends AppCompatActivity {
                 .setPositiveButton("OK", (d, w) -> {
                     try {
                         double val = Double.parseDouble(String.valueOf(input.getText()).replace(",", "."));
-                        maybeAddonsThenCart(p, opt, val);
+                        maybeAddonsThenCart(p, opt, val, quantity);
                     } catch (Exception e) {
                         Toast.makeText(this, "Valor inválido", Toast.LENGTH_SHORT).show();
                     }
@@ -451,13 +470,13 @@ public class OrderActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void maybeAddonsThenCart(CatalogModels.ProductDto p, CatalogModels.OptionDto opt, double unit) {
+    private void maybeAddonsThenCart(CatalogModels.ProductDto p, CatalogModels.OptionDto opt, double unit, int quantity) {
         CatalogModels.AddOnGroupDto group = resolveAddOnGroup(p);
         if (group == null) {
-            pushLine(p, opt, unit, new ArrayList<>());
+            pushLine(p, opt, unit, new ArrayList<>(), quantity);
             return;
         }
-        pickAddons(group, selected -> pushLine(p, opt, unit, selected));
+        pickAddons(group, selected -> pushLine(p, opt, unit, selected, quantity));
     }
 
     private CatalogModels.AddOnGroupDto resolveAddOnGroup(CatalogModels.ProductDto p) {
@@ -584,12 +603,12 @@ public class OrderActivity extends AppCompatActivity {
     }
 
     private void pushLine(CatalogModels.ProductDto p, CatalogModels.OptionDto opt, double unit,
-                          List<CatalogModels.CartAddon> addons) {
+                          List<CatalogModels.CartAddon> addons, int quantity) {
         CatalogModels.CartLine line = new CatalogModels.CartLine();
         line.productId = p.id;
         line.productName = p.name + (opt != null ? " - " + opt.label : "");
         line.productValue = unit;
-        line.quantity = 1;
+        line.quantity = Math.max(1, quantity);
         line.grupo = p.grupo;
         line.idUniplus = opt != null && opt.idUniplus != null ? opt.idUniplus : p.idUniplus;
         if (opt != null) {
@@ -599,6 +618,7 @@ public class OrderActivity extends AppCompatActivity {
         line.addons = addons;
         cart.add(line);
         refreshCart();
+        resetPendingQuantity(p.id);
         CartObservation.show(this, line, true, this::refreshCart);
     }
 
@@ -638,7 +658,7 @@ public class OrderActivity extends AppCompatActivity {
         return "R$ " + String.format(Locale.US, "%.2f", value);
     }
 
-    private void startHalf(CatalogModels.ProductDto base, CatalogModels.OptionDto baseOpt) {
+    private void startHalf(CatalogModels.ProductDto base, CatalogModels.OptionDto baseOpt, int quantity) {
         List<CatalogModels.ProductDto> candidates = new ArrayList<>();
         String wantGrupo = base.halfAndHalfGrupo;
         for (CatalogModels.ProductDto p : allProducts) {
@@ -666,13 +686,13 @@ public class OrderActivity extends AppCompatActivity {
                 .create();
         list.setAdapter(new HalfFlavorAdapter(candidates, baseOpt, other -> {
             dialog.dismiss();
-            finishHalf(base, baseOpt, other);
+            finishHalf(base, baseOpt, other, quantity);
         }));
         dialog.show();
     }
 
     private void finishHalf(CatalogModels.ProductDto base, CatalogModels.OptionDto baseOpt,
-                            CatalogModels.ProductDto other) {
+                            CatalogModels.ProductDto other, int quantity) {
         CatalogModels.OptionDto otherOpt = matchingOption(other, baseOpt);
         double v1 = baseOpt != null ? baseOpt.value : base.value;
         double v2 = otherOpt != null ? otherOpt.value : other.value;
@@ -687,7 +707,7 @@ public class OrderActivity extends AppCompatActivity {
         line.productId = base.id;
         line.productName = "Meio a meio: " + base.name + " / " + other.name;
         line.productValue = unit;
-        line.quantity = 1;
+        line.quantity = Math.max(1, quantity);
         line.grupo = base.grupo;
         line.half1ProductId = base.id;
         line.half2ProductId = other.id;
@@ -719,6 +739,7 @@ public class OrderActivity extends AppCompatActivity {
         line.addons = addons == null ? new ArrayList<>() : addons;
         cart.add(line);
         refreshCart();
+        resetPendingQuantity(line.productId);
         CartObservation.show(this, line, true, this::refreshCart);
     }
 
@@ -735,19 +756,36 @@ public class OrderActivity extends AppCompatActivity {
             holder.name.setText(p.name);
             holder.price.setText("R$ " + String.format(Locale.US, "%.2f", p.value));
             ImageStore.bind(holder.image, holder.itemView.getContext(), p.imageId);
-            holder.btnAdd.setOnClickListener(v -> addProduct(p));
+            int qty = pendingQuantity(p.id);
+            holder.txtQty.setText(String.valueOf(qty));
+            holder.boxQty.setVisibility(browseOnly ? View.GONE : View.VISIBLE);
+            holder.btnQtyMinus.setEnabled(qty > 1);
+            holder.btnQtyPlus.setOnClickListener(v -> {
+                int next = Math.min(99, pendingQuantity(p.id) + 1);
+                rememberQuantity(p.id, next);
+                holder.txtQty.setText(String.valueOf(next));
+                holder.btnQtyMinus.setEnabled(true);
+            });
+            holder.btnQtyMinus.setOnClickListener(v -> {
+                int next = Math.max(1, pendingQuantity(p.id) - 1);
+                rememberQuantity(p.id, next);
+                holder.txtQty.setText(String.valueOf(next));
+                holder.btnQtyMinus.setEnabled(next > 1);
+            });
+            holder.btnAdd.setOnClickListener(v -> addProduct(p, pendingQuantity(p.id)));
             holder.btnHalf.setVisibility(browseOnly || !p.allowsHalfAndHalf ? View.GONE : View.VISIBLE);
             holder.btnAdd.setVisibility(browseOnly ? View.GONE : View.VISIBLE);
             holder.btnHalf.setOnClickListener(v -> {
                 if (browseOnly) {
                     return;
                 }
+                int halfQty = pendingQuantity(p.id);
                 if (p.variations != null && !p.variations.isEmpty()
                         && p.variations.get(0).options != null
                         && !p.variations.get(0).options.isEmpty()) {
-                    pickOption(p, true);
+                    pickOption(p, true, halfQty);
                 } else {
-                    startHalf(p, null);
+                    startHalf(p, null, halfQty);
                 }
             });
         }
@@ -759,8 +797,8 @@ public class OrderActivity extends AppCompatActivity {
 
         class VH extends RecyclerView.ViewHolder {
             ImageView image;
-            TextView name, price;
-            View btnAdd, btnHalf;
+            TextView name, price, txtQty;
+            View btnAdd, btnHalf, boxQty, btnQtyPlus, btnQtyMinus;
             VH(View v) {
                 super(v);
                 image = v.findViewById(R.id.imgProduct);
@@ -768,6 +806,10 @@ public class OrderActivity extends AppCompatActivity {
                 price = v.findViewById(R.id.txtPrice);
                 btnAdd = v.findViewById(R.id.btnAdd);
                 btnHalf = v.findViewById(R.id.btnHalf);
+                boxQty = v.findViewById(R.id.boxQty);
+                txtQty = v.findViewById(R.id.txtQty);
+                btnQtyPlus = v.findViewById(R.id.btnQtyPlus);
+                btnQtyMinus = v.findViewById(R.id.btnQtyMinus);
             }
         }
     }

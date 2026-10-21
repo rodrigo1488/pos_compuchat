@@ -71,13 +71,25 @@ public class OccupyActivity extends AppCompatActivity {
         });
         inputName.addTextChangedListener(searchWatcher("name"));
         inputPhone.addTextChangedListener(searchWatcher("phone"));
+        inputName.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) scheduleSearch("name");
+        });
+        inputPhone.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) scheduleSearch("phone");
+        });
 
         new Thread(() -> {
             MesaEntity m = repo.dao().mesa(mesaId);
+            boolean ask = m != null && (m.askPhone || m.keywordValidation);
+            try {
+                PosApi.OccupationSettings settings = repo.api().occupationSettings();
+                if (settings.askPhone || settings.keywordValidation) ask = true;
+            } catch (Exception ignored) {
+            }
+            boolean showPhone = ask;
             runOnUiThread(() -> {
                 txt.setText(m == null ? "Mesa" : "Ocupar " + label(m));
-                boolean ask = m != null && (m.askPhone || m.keywordValidation);
-                phoneLayout.setVisibility(ask ? View.VISIBLE : View.GONE);
+                phoneLayout.setVisibility(showPhone ? View.VISIBLE : View.GONE);
             });
         }).start();
 
@@ -206,10 +218,6 @@ public class OccupyActivity extends AppCompatActivity {
         searchHandler.postDelayed(() -> {
             TextInputEditText field = "phone".equals(source) ? inputPhone : inputName;
             String q = String.valueOf(field.getText()).trim();
-            if (q.length() < 2) {
-                showCustomers(Collections.emptyList());
-                return;
-            }
             int gen = ++searchGen;
             new Thread(() -> {
                 try {
@@ -256,7 +264,10 @@ public class OccupyActivity extends AppCompatActivity {
         String raw = e == null || e.getMessage() == null ? "" : e.getMessage();
         if (raw.contains("KEYWORD_INVALID")) return "Palavra-chave incorreta.";
         if (raw.contains("EXPIRED")) return "Palavra-chave expirada. Ocupe a mesa de novo.";
-        if (raw.contains("NOT_FOUND")) return "Não há confirmação pendente. Ocupe a mesa de novo.";
+        if (raw.contains("CONFIRMATION_NOT_FOUND")) return "Não há confirmação pendente. Ocupe a mesa de novo.";
+        if (raw.contains("ERR_CONTACT_NOT_FOUND") || raw.contains("ERR_NO_CONTACT_FOUND")) {
+            return "Não foi possível usar esse cliente. Tente de novo ou apague o telefone.";
+        }
         if (raw.contains("ERR_INVALID_PHONE") || raw.contains("telefone_invalido")) return "Telefone inválido.";
         if (raw.contains("WHATSAPP")) return "Não foi possível enviar a palavra-chave pelo WhatsApp.";
         return PosApi.friendlyError(e);

@@ -26,6 +26,7 @@ public class PosApi {
     private final OkHttpClient pingClient;
     private final Gson gson = new Gson();
     private final Context ctx;
+    private int tipopedidoCache = 0;
 
     public PosApi(Context ctx) {
         this.ctx = ctx.getApplicationContext();
@@ -155,7 +156,7 @@ public class PosApi {
     }
 
     public List<CatalogModels.MesaDto> mesas() throws IOException {
-        String raw = body(req("/pos/mesas").get().build());
+        String raw = body(req(withTipopedido("/pos/mesas")).get().build());
         JsonObject o = gson.fromJson(raw, JsonObject.class);
         CatalogModels.Catalog c = new CatalogModels.Catalog();
         if (o.has("mesas")) {
@@ -165,6 +166,32 @@ public class PosApi {
             }
         }
         return c.mesas;
+    }
+
+    public int tipopedido() {
+        if (tipopedidoCache > 0) {
+            return tipopedidoCache;
+        }
+        try {
+            String raw = body(req("/pos/order-settings").get().build());
+            JsonObject o = gson.fromJson(raw, JsonObject.class);
+            int value = 2;
+            if (o != null && o.has("tipopedido") && !o.get("tipopedido").isJsonNull()) {
+                value = o.get("tipopedido").getAsInt();
+            }
+            if (value == 0) {
+                value = 2;
+            }
+            tipopedidoCache = value;
+        } catch (Exception ignored) {
+            tipopedidoCache = 2;
+        }
+        return tipopedidoCache;
+    }
+
+    private String withTipopedido(String path) {
+        String join = path.contains("?") ? "&" : "?";
+        return path + join + "tipopedido=" + tipopedido();
     }
 
     public List<CatalogModels.CustomerDto> customers(String q) throws IOException {
@@ -179,6 +206,17 @@ public class PosApi {
             }
         }
         return out;
+    }
+
+    public static class OccupationSettings {
+        public boolean askPhone;
+        public boolean keywordValidation;
+    }
+
+    public OccupationSettings occupationSettings() throws IOException {
+        String raw = body(req("/pos/occupation-settings").get().build());
+        OccupationSettings settings = gson.fromJson(raw, OccupationSettings.class);
+        return settings == null ? new OccupationSettings() : settings;
     }
 
     public static class OccupyResult {
@@ -245,7 +283,8 @@ public class PosApi {
     }
 
     public CatalogModels.OrderResult sendOrder(int mesaId, String tableNumber, String customerName,
-                            String garcomName, List<CatalogModels.CartLine> lines, String clientOrderId) throws IOException {
+                            String garcomName, List<CatalogModels.CartLine> lines, String clientOrderId,
+                            String fulfillmentMode) throws IOException {
         JsonObject o = new JsonObject();
         o.addProperty("clientOrderId", clientOrderId == null || clientOrderId.isEmpty()
                 ? java.util.UUID.randomUUID().toString() : clientOrderId);
@@ -254,6 +293,10 @@ public class PosApi {
         o.addProperty("customerName", customerName);
         o.addProperty("garcomName", garcomName);
         o.addProperty("orderType", "mesa");
+        boolean takeaway = "pickup".equals(fulfillmentMode);
+        o.addProperty("fulfillmentMode", takeaway ? "pickup" : "dine_in");
+        o.addProperty("pickup", takeaway);
+        o.addProperty("retirada", takeaway);
         JsonArray items = new JsonArray();
         for (CatalogModels.CartLine line : lines) {
             JsonObject tree = gson.toJsonTree(line).getAsJsonObject();
@@ -267,13 +310,13 @@ public class PosApi {
     }
 
     public CatalogModels.ContaResumo conta(String tableNumber) throws IOException {
-        String raw = body(req("/pos/conta?numeromesa=" + java.net.URLEncoder.encode(tableNumber, "UTF-8")).get().build());
+        String raw = body(req(withTipopedido("/pos/conta?numeromesa=" + java.net.URLEncoder.encode(tableNumber, "UTF-8"))).get().build());
         CatalogModels.ContaResumo resumo = gson.fromJson(raw, CatalogModels.ContaResumo.class);
         return resumo == null ? new CatalogModels.ContaResumo() : resumo;
     }
 
     public CatalogModels.PedidoDia pedidos() throws IOException {
-        String raw = body(req("/pos/pedidos").get().build());
+        String raw = body(req(withTipopedido("/pos/pedidos")).get().build());
         CatalogModels.PedidoDia dia = gson.fromJson(raw, CatalogModels.PedidoDia.class);
         if (dia == null) {
             dia = new CatalogModels.PedidoDia();

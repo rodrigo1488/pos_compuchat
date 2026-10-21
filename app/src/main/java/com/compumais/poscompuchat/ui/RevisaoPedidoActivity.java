@@ -72,7 +72,8 @@ public class RevisaoPedidoActivity extends AppCompatActivity implements CartList
         list.setAdapter(adapter);
 
         findViewById(R.id.btnBack).setOnClickListener(v -> returnCartToOrder());
-        findViewById(R.id.btnSend).setOnClickListener(v -> sendOrder());
+        findViewById(R.id.btnDineIn).setOnClickListener(v -> sendOrder(false));
+        findViewById(R.id.btnTakeaway).setOnClickListener(v -> sendOrder(true));
         findViewById(R.id.btnOrderStatusOk).setOnClickListener(v -> goBackToMesas());
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -111,10 +112,14 @@ public class RevisaoPedidoActivity extends AppCompatActivity implements CartList
     private void onConnectionStatus(boolean connected, String message) {
         online = connected;
         ConnectionWatch.bindBanner(this, connected, message);
-        View btnSend = findViewById(R.id.btnSend);
-        if (btnSend != null) {
-            btnSend.setEnabled(connected && !cart.isEmpty());
-        }
+        setSendButtonsEnabled(connected && !cart.isEmpty());
+    }
+
+    private void setSendButtonsEnabled(boolean enabled) {
+        View dineIn = findViewById(R.id.btnDineIn);
+        View takeaway = findViewById(R.id.btnTakeaway);
+        if (dineIn != null) dineIn.setEnabled(enabled);
+        if (takeaway != null) takeaway.setEnabled(enabled);
     }
 
     private void loadProducts() {
@@ -152,10 +157,7 @@ public class RevisaoPedidoActivity extends AppCompatActivity implements CartList
         }
         TextView txt = findViewById(R.id.txtCartTotal);
         txt.setText("Total  R$ " + String.format(Locale.US, "%.2f", total));
-        View btnSend = findViewById(R.id.btnSend);
-        if (btnSend != null) {
-            btnSend.setEnabled(online && !cart.isEmpty());
-        }
+        setSendButtonsEnabled(online && !cart.isEmpty());
     }
 
     @Override
@@ -192,7 +194,7 @@ public class RevisaoPedidoActivity extends AppCompatActivity implements CartList
         finish();
     }
 
-    private void sendOrder() {
+    private void sendOrder(boolean takeaway) {
         if (!online) {
             Toast.makeText(this, "Sem conexão com o servidor", Toast.LENGTH_SHORT).show();
             return;
@@ -204,34 +206,37 @@ public class RevisaoPedidoActivity extends AppCompatActivity implements CartList
         if (pendingOrderId == null) {
             pendingOrderId = java.util.UUID.randomUUID().toString();
         }
-        findViewById(R.id.btnSend).setEnabled(false);
-        showOrderSending();
+        setSendButtonsEnabled(false);
+        showOrderSending(takeaway);
         String table = tableNumber == null ? "" : tableNumber;
         String customer = customerName == null || customerName.isEmpty() ? "Cliente" : customerName;
+        String fulfillment = takeaway ? "pickup" : "dine_in";
         new Thread(() -> {
             try {
                 CatalogModels.OrderResult result = repo.api().sendOrder(
                         mesaId, table, customer, Prefs.userName(this),
-                        new ArrayList<>(cart), pendingOrderId);
+                        new ArrayList<>(cart), pendingOrderId, fulfillment);
                 runOnUiThread(() -> showOrderDone(result));
             } catch (Exception e) {
                 runOnUiThread(() -> {
                     hideOrderStatus();
-                    findViewById(R.id.btnSend).setEnabled(online && !cart.isEmpty());
+                    setSendButtonsEnabled(online && !cart.isEmpty());
                     Toast.makeText(this, PosApi.friendlyError(e), Toast.LENGTH_LONG).show();
                 });
             }
         }).start();
     }
 
-    private void showOrderSending() {
+    private void showOrderSending(boolean takeaway) {
         View panel = findViewById(R.id.panelOrderStatus);
         panel.setVisibility(View.VISIBLE);
         findViewById(R.id.progressOrder).setVisibility(View.VISIBLE);
         findViewById(R.id.imgOrderStatus).setVisibility(View.GONE);
         findViewById(R.id.btnOrderStatusOk).setVisibility(View.GONE);
         findViewById(R.id.txtOrderStatusSub).setVisibility(View.GONE);
-        ((TextView) findViewById(R.id.txtOrderStatusTitle)).setText("Enviando pedido…");
+        ((TextView) findViewById(R.id.txtOrderStatusTitle)).setText(
+                takeaway ? "Enviando para levar…" : "Enviando consumo no local…"
+        );
     }
 
     private void showOrderDone(CatalogModels.OrderResult result) {
