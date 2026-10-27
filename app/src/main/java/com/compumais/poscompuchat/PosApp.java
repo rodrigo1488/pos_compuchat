@@ -9,5 +9,6 @@ public class PosApp extends Application {
     public void onCreate() {
         super.onCreate();
         AppDatabase.get(this);
+        AppUpdater.iniciar(this);
     }
 }

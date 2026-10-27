@@ -1,6 +1,24 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
 }
+
+val atualizacaoProperties = Properties().apply {
+    val arquivo = rootProject.file("atualizacao.properties")
+    if (arquivo.exists()) {
+        arquivo.inputStream().use { load(it) }
+    }
+}
+
+fun atualizacao(nome: String, padrao: String): String {
+    val ambiente = System.getenv(nome)?.trim().orEmpty()
+    if (ambiente.isNotEmpty()) return ambiente
+    return atualizacaoProperties.getProperty(nome)?.trim()?.takeIf { it.isNotEmpty() } ?: padrao
+}
+
+fun asBuildConfigString(valor: String): String =
+    "\"" + valor.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
     namespace = "com.compumais.poscompuchat"
@@ -18,6 +36,17 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String",
+            "UTILITY_UPDATE_BASE",
+            asBuildConfigString(atualizacao("COMPUTICKET_UPDATE_BASE", "https://www.computicket.space")),
+        )
+        buildConfigField(
+            "String",
+            "UTILITY_UPDATE_HASH",
+            asBuildConfigString(atualizacao("COMPUTICKET_UPDATE_HASH", "")),
+        )
     }
 
     buildTypes {
@@ -30,6 +59,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+    buildFeatures {
+        buildConfig = true
     }
 }
 

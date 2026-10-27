@@ -9,6 +9,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.compumais.poscompuchat.AppUpdater;
 import com.compumais.poscompuchat.Prefs;
 import com.compumais.poscompuchat.R;
 import com.compumais.poscompuchat.data.CatalogModels;
@@ -49,7 +50,18 @@ public class ConfigActivity extends AppCompatActivity {
         btnSave.setOnClickListener(v -> testAndSave(false));
         btnCatalog.setOnClickListener(v -> testAndSave(true));
         findViewById(R.id.btnCancelFila).setOnClickListener(v -> confirmCancelFila());
+        findViewById(R.id.btnAtualizarApp).setOnClickListener(v -> atualizarAplicativo());
         bindLogout();
+    }
+
+    private void atualizarAplicativo() {
+        View botao = findViewById(R.id.btnAtualizarApp);
+        TextView aviso = findViewById(R.id.txtAtualizacaoApp);
+        botao.setEnabled(false);
+        AppUpdater.verificarManual(this, texto -> runOnUiThread(() -> {
+            aviso.setText(texto);
+            botao.setEnabled(!texto.startsWith("Verificando"));
+        }));
     }
 
     private void confirmCancelFila() {

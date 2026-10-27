@@ -1,0 +1,4 @@
+# Copie este arquivo para atualizacao.properties antes de gerar o APK.
+# Esse arquivo local não entra no git. Variáveis de ambiente com o mesmo nome têm prioridade.
+COMPUTICKET_UPDATE_BASE=https://www.computicket.space
+COMPUTICKET_UPDATE_HASH=

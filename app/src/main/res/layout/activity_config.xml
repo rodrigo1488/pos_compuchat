@@ -126,6 +126,38 @@
         android:textColor="#374151"
         android:textSize="14sp" />
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:text="Aplicativo"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Consulta a versão publicada e instala se houver uma nova."
+        android:textColor="#6B7280"
+        android:textSize="13sp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnAtualizarApp"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Atualizar aplicativo" />
+
+    <TextView
+        android:id="@+id/txtAtualizacaoApp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="#374151"
+        android:textSize="14sp" />
+
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
